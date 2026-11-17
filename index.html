@@ -356,21 +356,89 @@ const data = [
     ]
   },
 ];
-const STORAGE_KEY = "shopping_checklist_state_v1";
+const STORAGE_KEY = "shopping_checklist_state_v1"; // local fallback only
+const DB_PATH = "checklist/state";
 
-function loadState(){
+function loadLocalState(){
   try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
   catch(e){ return {}; }
 }
-function saveState(state){
+function saveLocalState(state){
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
 }
 
-let state = loadState();
+let state = loadLocalState();
 let filter = "all"; // all | pending | done
 let searchTerm = "";
+let db = null;
+let docVersion = null;      // version of the shared doc, for safe writes
+let syncing = false;        // true once connected to shared db
+let pendingWrite = null;    // debounce handle
+
+const syncBadge = document.createElement("div");
+syncBadge.id = "syncBadge";
+syncBadge.style.cssText = "font-size:0.72rem;margin-top:6px;opacity:0.9;";
+document.querySelector("header").appendChild(syncBadge);
+
+function setSyncBadge(text){
+  syncBadge.textContent = text;
+}
+setSyncBadge("⏳ Connecting…");
 
 function keyFor(catIdx, itemIdx){ return catIdx + "_" + itemIdx; }
+
+// Write the full state object to the shared db (debounced slightly so rapid
+// taps don't spam writes), falling back to localStorage if db isn't available.
+function persistState(){
+  saveLocalState(state); // always keep a local backup too
+  if(!db){ return; }
+  if(pendingWrite) clearTimeout(pendingWrite);
+  pendingWrite = setTimeout(() => {
+    const op = docVersion
+      ? { op: "update", path: DB_PATH, data: state, ifVersion: docVersion }
+      : { op: "set", path: DB_PATH, data: state };
+    db.write([op]).then(() => {
+      // version gets updated via the live snapshot listener
+    }).catch((err) => {
+      // Likely a version conflict from a concurrent edit on another device.
+      // The snapshot listener will bring us back in sync; just log it.
+      console.warn("db write failed, will resync from snapshot:", err);
+    });
+  }, 150);
+}
+
+async function initDb(){
+  try{
+    db = await claude.use("db");
+  }catch(e){
+    db = null;
+  }
+  if(!db){
+    setSyncBadge("📴 Offline mode (this device only)");
+    return;
+  }
+  setSyncBadge("🔄 Syncing…");
+  try{
+    db.doc(DB_PATH).onSnapshot((doc) => {
+      if(doc && doc.data){
+        state = doc.data;
+        docVersion = doc.version;
+      } else {
+        // doc doesn't exist yet — seed it from whatever we have locally
+        docVersion = null;
+      }
+      syncing = true;
+      setSyncBadge("✅ Synced across devices");
+      render();
+    }, (err) => {
+      console.warn("snapshot error:", err);
+      setSyncBadge("⚠️ Sync error — using local copy");
+    });
+  }catch(e){
+    console.warn("onSnapshot setup failed:", e);
+    setSyncBadge("⚠️ Sync unavailable — using local copy");
+  }
+}
 
 function render(){
   const main = document.getElementById("main");
@@ -423,7 +491,7 @@ function render(){
       row.addEventListener("click", () => {
         const k = keyFor(catIdx, itemIdx);
         state[k] = !state[k];
-        saveState(state);
+        persistState();
         render();
       });
       card.appendChild(row);
@@ -457,14 +525,15 @@ document.getElementById("filterPending").addEventListener("click", () => setFilt
 document.getElementById("filterDone").addEventListener("click", () => setFilter("done"));
 
 document.getElementById("resetBtn").addEventListener("click", () => {
-  if(confirm("Reset all items to not bought?")){
+  if(confirm("Reset all items to not bought? This resets it for everyone.")){
     state = {};
-    saveState(state);
+    persistState();
     render();
   }
 });
 
 render();
+initDb();
 </script>
 </body>
 </html>
