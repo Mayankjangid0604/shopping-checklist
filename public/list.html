@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>सामग्री सूची</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <a href="/" class="back-link">← सूचियाँ</a>
+    <h1 id="listTitle">सूची</h1>
+    <div class="sub" id="listSubtitle"></div>
+    <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
+    <div class="progress-text" id="progressText">0 / 0 खरीदा गया</div>
+  </header>
+
+  <div class="controls">
+    <input type="text" id="searchBox" placeholder="सामान खोजें...">
+    <button id="filterAll" class="active">सभी</button>
+    <button id="filterPending">बाकी</button>
+    <button id="filterDone">खरीदा</button>
+  </div>
+
+  <main id="main"><div class="loading">लोड हो रहा है...</div></main>
+
+  <footer>
+    <span id="footerCount">0 आइटम बाकी</span>
+    <button id="resetBtn">सभी रीसेट करें</button>
+  </footer>
+
+  <script src="app.js"></script>
+  <script>
+    renderListPage();
+  </script>
+</body>
+</html>

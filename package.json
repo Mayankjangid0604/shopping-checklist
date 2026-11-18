@@ -1,0 +1,17 @@
+{
+  "name": "samagri-list-app",
+  "version": "1.0.0",
+  "description": "Shared shopping checklist app - multiple lists, synced across every device, no login required",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
